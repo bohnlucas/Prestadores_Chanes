@@ -3,7 +3,7 @@ import {
   Plus, Search, Edit2, Trash2, Phone, Mail, X, MessageCircle, Hammer,
   Filter, ChevronDown, ChevronRight, StickyNote, Users, LayoutList,
   LayoutGrid, ArrowUpDown, Upload, Download, Sun, Moon, GitCompare, TrendingDown,
-  Copy, Check,
+  Copy, Check, CheckCircle2,
 } from "lucide-react";
 import { supabase, toDb, fromDb } from "./supabase";
 
@@ -23,12 +23,22 @@ const STATUS_OPTIONS = [
 ];
 
 const SORT_OPTIONS = [
+  { value: "status", label: "Por status (funil)" },
   { value: "recent", label: "Mais recentes" },
   { value: "oldest", label: "Mais antigos" },
   { value: "name", label: "Nome (A-Z)" },
   { value: "budget_desc", label: "Orçamento (maior)" },
   { value: "budget_asc", label: "Orçamento (menor)" },
 ];
+
+const STATUS_PRIORITY = {
+  contratado: 0,
+  em_negociacao: 1,
+  orcamento_recebido: 2,
+  aguardando_orcamento: 3,
+  contato_inicial: 4,
+  descartado: 5,
+};
 
 const PERIOD_OPTIONS = [
   { value: "", label: "Qualquer data" },
@@ -72,8 +82,8 @@ const emptyProvider = {
 
 const defaultFilters = {
   status: "", service: "", period: "",
-  hasWhatsapp: false, hasBudget: false, hasReferral: false,
-  recent: false, hideDescartado: true,
+  hasBudget: false,
+  recent: false, hideDescartado: true, hideContratado: false,
 };
 
 export default function App() {
@@ -85,7 +95,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState(defaultFilters);
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState("recent");
+  const [sortBy, setSortBy] = useState("status");
   const [viewMode, setViewMode] = useState("list");
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -146,6 +156,10 @@ export default function App() {
   };
 
   const remove = (provider) => setPendingDelete(provider);
+
+  const markAsContratado = async (provider) => {
+    await upsert({ ...provider, status: "contratado" });
+  };
 
   const confirmRemove = async () => {
     if (!pendingDelete) return;
@@ -213,7 +227,7 @@ export default function App() {
 
   const activeFilterCount = useMemo(() => {
     return Object.entries(filters).filter(([k, v]) => {
-      if (k === "hideDescartado") return false;
+      if (k === "hideDescartado" || k === "hideContratado") return false;
       return typeof v === "boolean" ? v : Boolean(v);
     }).length;
   }, [filters]);
@@ -232,14 +246,19 @@ export default function App() {
       if (filters.status && p.status !== filters.status) return false;
       if (filters.service && p.serviceType !== filters.service) return false;
       if (filters.period && daysSince(p.createdAt) > parseInt(filters.period)) return false;
-      if (filters.hasWhatsapp && !onlyDigits(p.phone)) return false;
       if (filters.hasBudget && !(parseFloat(p.budget) > 0)) return false;
-      if (filters.hasReferral && !p.referredBy?.trim()) return false;
       if (filters.recent && daysSince(p.createdAt) > 7) return false;
       if (filters.hideDescartado && p.status === "descartado") return false;
+      if (filters.hideContratado && p.status === "contratado") return false;
       return true;
     });
     const cmp = {
+      status: (a, b) => {
+        const pa = STATUS_PRIORITY[a.status] ?? 99;
+        const pb = STATUS_PRIORITY[b.status] ?? 99;
+        if (pa !== pb) return pa - pb;
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      },
       recent: (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
       oldest: (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0),
       name: (a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR"),
@@ -399,10 +418,9 @@ export default function App() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Chip active={filters.hideDescartado} onClick={() => toggleFilter("hideDescartado")} label="Ocultar descartados" />
+            <Chip active={filters.hideContratado} onClick={() => toggleFilter("hideContratado")} label="Ocultar contratados" />
             <Chip active={filters.recent} onClick={() => toggleFilter("recent")} label="Recentes (7d)" />
             <Chip active={filters.hasBudget} onClick={() => toggleFilter("hasBudget")} label="Com orçamento" />
-            <Chip active={filters.hasWhatsapp} onClick={() => toggleFilter("hasWhatsapp")} label="Com WhatsApp" />
-            <Chip active={filters.hasReferral} onClick={() => toggleFilter("hasReferral")} label="Indicados" />
 
             <div className="ml-auto flex items-center gap-2">
               <ArrowUpDown className="h-3.5 w-3.5 text-stone-400 dark:text-stone-500" />
@@ -449,8 +467,10 @@ export default function App() {
             <div className="space-y-3">
               {filtered.map((p) => (
                 <ProviderCard key={p.id} provider={p}
+                  searchTerm={search}
                   onEdit={() => { setEditing(p); setShowForm(true); }}
-                  onDelete={() => remove(p)} />
+                  onDelete={() => remove(p)}
+                  onMarkContratado={() => markAsContratado(p)} />
               ))}
             </div>
           ) : (
@@ -491,8 +511,10 @@ export default function App() {
                       <div className="space-y-3">
                         {g.items.map((p) => (
                           <ProviderCard key={p.id} provider={p} hideServiceType
+                            searchTerm={search}
                             onEdit={() => { setEditing(p); setShowForm(true); }}
-                            onDelete={() => remove(p)} />
+                            onDelete={() => remove(p)}
+                            onMarkContratado={() => markAsContratado(p)} />
                         ))}
                       </div>
                     )}
@@ -730,6 +752,31 @@ function ConfirmDialog({ title, message, confirmLabel = "Confirmar", onConfirm, 
   );
 }
 
+function Highlight({ text, term }) {
+  if (!text) return null;
+  if (!term || !term.trim()) return <>{text}</>;
+
+  const t = term.toLowerCase();
+  const lower = text.toLowerCase();
+  const parts = [];
+  let lastIndex = 0;
+  let idx = lower.indexOf(t);
+
+  while (idx !== -1) {
+    if (idx > lastIndex) parts.push(text.slice(lastIndex, idx));
+    parts.push(
+      <mark key={parts.length} className="rounded bg-amber-200 px-0.5 text-stone-900 dark:bg-amber-500/40 dark:text-stone-100">
+        {text.slice(idx, idx + t.length)}
+      </mark>
+    );
+    lastIndex = idx + t.length;
+    idx = lower.indexOf(t, lastIndex);
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+
+  return <>{parts}</>;
+}
+
 function CopyButton({ text, label = "" }) {
   const [copied, setCopied] = useState(false);
 
@@ -795,19 +842,28 @@ function FilterSelect({ label, value, onChange, options }) {
   );
 }
 
-function ProviderCard({ provider, onEdit, onDelete, hideServiceType }) {
+function ProviderCard({ provider, onEdit, onDelete, onMarkContratado, hideServiceType, searchTerm }) {
   const status = statusMeta(provider.status);
   const wa = waLink(provider.phone);
+  const canPromote = provider.status === "em_negociacao" || provider.status === "orcamento_recebido";
   return (
     <article className="group rounded-2xl border border-stone-200 bg-white p-5 transition hover:border-stone-300 hover:shadow-sm dark:border-stone-800 dark:bg-stone-900 dark:hover:border-stone-700">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <h3 className="font-display text-xl font-medium leading-tight tracking-tight">{provider.name || "Sem nome"}</h3>
-            {provider.company && <span className="text-sm text-stone-500 dark:text-stone-400">· {provider.company}</span>}
+            <h3 className="font-display text-xl font-medium leading-tight tracking-tight">
+              <Highlight text={provider.name || "Sem nome"} term={searchTerm} />
+            </h3>
+            {provider.company && (
+              <span className="text-sm text-stone-500 dark:text-stone-400">
+                · <Highlight text={provider.company} term={searchTerm} />
+              </span>
+            )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
-            {!hideServiceType && provider.serviceType && <span>{provider.serviceType}</span>}
+            {!hideServiceType && provider.serviceType && (
+              <span><Highlight text={provider.serviceType} term={searchTerm} /></span>
+            )}
             <span className="inline-flex items-center gap-1.5">
               <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
               {status.label}
@@ -815,9 +871,21 @@ function ProviderCard({ provider, onEdit, onDelete, hideServiceType }) {
             {provider.createdAt && <span className="text-stone-400 dark:text-stone-500">Adicionado em {fmtDate(provider.createdAt)}</span>}
           </div>
         </div>
-        <div className="flex gap-1 opacity-60 transition group-hover:opacity-100">
-          <button onClick={onEdit} className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"><Edit2 className="h-4 w-4" /></button>
-          <button onClick={onDelete} className="rounded-full p-2 text-stone-500 hover:bg-rose-50 hover:text-rose-600 dark:text-stone-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>
+        <div className="flex items-start gap-2">
+          {canPromote && onMarkContratado && (
+            <button
+              onClick={onMarkContratado}
+              title="Marcar como contratado"
+              className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Contratar</span>
+            </button>
+          )}
+          <div className="flex gap-1 opacity-60 transition group-hover:opacity-100">
+            <button onClick={onEdit} className="rounded-full p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"><Edit2 className="h-4 w-4" /></button>
+            <button onClick={onDelete} className="rounded-full p-2 text-stone-500 hover:bg-rose-50 hover:text-rose-600 dark:text-stone-400 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>
+          </div>
         </div>
       </div>
 
@@ -852,7 +920,7 @@ function ProviderCard({ provider, onEdit, onDelete, hideServiceType }) {
           {provider.referredBy && (
             <div className="flex items-center gap-2 text-stone-700 dark:text-stone-300">
               <span className="text-xs uppercase tracking-wider text-stone-400 dark:text-stone-500">Indicado por</span>
-              <span>{provider.referredBy}</span>
+              <span><Highlight text={provider.referredBy} term={searchTerm} /></span>
             </div>
           )}
         </div>
@@ -861,7 +929,7 @@ function ProviderCard({ provider, onEdit, onDelete, hideServiceType }) {
       {provider.notes && (
         <div className="mt-4 flex gap-2 rounded-lg bg-stone-50 p-3 text-sm text-stone-600 dark:bg-stone-950/50 dark:text-stone-400">
           <StickyNote className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-stone-400 dark:text-stone-500" />
-          <p className="whitespace-pre-wrap">{provider.notes}</p>
+          <p className="whitespace-pre-wrap"><Highlight text={provider.notes} term={searchTerm} /></p>
         </div>
       )}
     </article>

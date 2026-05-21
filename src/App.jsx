@@ -3,6 +3,7 @@ import {
   Plus, Search, Edit2, Trash2, Phone, Mail, X, MessageCircle, Hammer,
   Filter, ChevronDown, ChevronRight, StickyNote, Users, LayoutList,
   LayoutGrid, ArrowUpDown, Upload, Download, Sun, Moon, GitCompare, TrendingDown,
+  Copy, Check,
 } from "lucide-react";
 import { supabase, toDb, fromDb } from "./supabase";
 
@@ -668,6 +669,7 @@ function ComparisonCard({ provider, isCheapest }) {
             <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Contato</div>
             <div className="mt-0.5 flex items-center gap-2 text-stone-700 dark:text-stone-300">
               <a href={`tel:${onlyDigits(provider.phone)}`} className="hover:underline">{fmtPhone(provider.phone)}</a>
+              <CopyButton text={fmtPhone(provider.phone)} label="telefone" />
               {wa && (
                 <a href={wa} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60">
@@ -682,7 +684,10 @@ function ComparisonCard({ provider, isCheapest }) {
         {provider.email && (
           <div>
             <div className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">E-mail</div>
-            <a href={`mailto:${provider.email}`} className="mt-0.5 block truncate text-stone-700 hover:underline dark:text-stone-300">{provider.email}</a>
+            <div className="mt-0.5 flex items-center gap-2">
+              <a href={`mailto:${provider.email}`} className="block truncate text-stone-700 hover:underline dark:text-stone-300">{provider.email}</a>
+              <CopyButton text={provider.email} label="e-mail" />
+            </div>
           </div>
         )}
 
@@ -722,6 +727,36 @@ function ConfirmDialog({ title, message, confirmLabel = "Confirmar", onConfirm, 
         </div>
       </div>
     </div>
+  );
+}
+
+function CopyButton({ text, label = "" }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error("Erro ao copiar:", err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? "Copiado!" : `Copiar ${label}`}
+      className={`rounded-full p-1 transition ${
+        copied
+          ? "text-emerald-600 dark:text-emerald-400"
+          : "text-stone-400 hover:bg-stone-100 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+      }`}
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
   );
 }
 
@@ -792,6 +827,7 @@ function ProviderCard({ provider, onEdit, onDelete, hideServiceType }) {
             <div className="flex items-center gap-2 text-stone-700 dark:text-stone-300">
               <Phone className="h-3.5 w-3.5 text-stone-400 dark:text-stone-500" />
               <a href={`tel:${onlyDigits(provider.phone)}`} className="hover:underline">{fmtPhone(provider.phone)}</a>
+              <CopyButton text={fmtPhone(provider.phone)} label="telefone" />
               {wa && (
                 <a href={wa} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60">
@@ -804,6 +840,7 @@ function ProviderCard({ provider, onEdit, onDelete, hideServiceType }) {
             <div className="flex items-center gap-2 text-stone-700 dark:text-stone-300">
               <Mail className="h-3.5 w-3.5 text-stone-400 dark:text-stone-500" />
               <a href={`mailto:${provider.email}`} className="truncate hover:underline">{provider.email}</a>
+              <CopyButton text={provider.email} label="e-mail" />
             </div>
           )}
           {provider.budget && (

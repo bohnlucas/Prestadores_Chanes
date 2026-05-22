@@ -95,7 +95,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState(defaultFilters);
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState("status");
+  const [sortBy, setSortBy] = useState("recent");
   const [viewMode, setViewMode] = useState("list");
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [pendingDelete, setPendingDelete] = useState(null);

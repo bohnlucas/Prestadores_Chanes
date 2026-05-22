@@ -979,8 +979,8 @@ function ProviderForm({ initial, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-900/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()}
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-900/40 backdrop-blur-sm sm:items-center">
+      <div
         className="font-body relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-stone-50 p-6 shadow-2xl dark:bg-stone-900 sm:rounded-3xl sm:p-8">
         <button onClick={onClose} className="absolute right-5 top-5 rounded-full p-2 text-stone-500 hover:bg-stone-200 dark:text-stone-400 dark:hover:bg-stone-800"><X className="h-4 w-4" /></button>
         <h2 className="font-display text-3xl font-medium tracking-tight">{initial ? "Editar prestador" : "Novo prestador"}</h2>

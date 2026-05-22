@@ -395,7 +395,15 @@ export default function App() {
             </div>
 
             <button
-              onClick={() => setShowFilters((s) => !s)}
+              onClick={() => {
+                if (activeFilterCount > 0) {
+                  setFilters(defaultFilters);
+                  setShowFilters(false);
+                } else {
+                  setShowFilters((s) => !s);
+                }
+              }}
+              title={activeFilterCount > 0 ? "Limpar filtros" : "Abrir filtros"}
               className={`flex items-center gap-1.5 rounded-full border px-4 py-3 text-sm transition ${
                 showFilters || activeFilterCount > 0
                   ? "border-stone-900 bg-stone-900 text-stone-50 dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900"

@@ -83,7 +83,7 @@ const emptyProvider = {
 const defaultFilters = {
   status: "", service: "", period: "",
   hasBudget: false,
-  recent: false, hideDescartado: true, hideContratado: false,
+  recent: false, hideDescartado: true, hideContratado: false, onlyContratado: false,
 };
 
 export default function App() {
@@ -250,6 +250,7 @@ export default function App() {
       if (filters.recent && daysSince(p.createdAt) > 7) return false;
       if (filters.hideDescartado && p.status === "descartado") return false;
       if (filters.hideContratado && p.status === "contratado") return false;
+      if (filters.onlyContratado && p.status !== "contratado") return false;
       return true;
     });
     const cmp = {
@@ -426,9 +427,10 @@ export default function App() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Chip active={filters.hideDescartado} onClick={() => toggleFilter("hideDescartado")} label="Ocultar descartados" />
-            <Chip active={filters.hideContratado} onClick={() => toggleFilter("hideContratado")} label="Ocultar contratados" />
+            <Chip active={filters.hideContratado} onClick={() => setFilters((f) => ({ ...f, hideContratado: !f.hideContratado, onlyContratado: false }))} label="Ocultar contratados" />
             <Chip active={filters.recent} onClick={() => toggleFilter("recent")} label="Recentes (7d)" />
             <Chip active={filters.hasBudget} onClick={() => toggleFilter("hasBudget")} label="Com orçamento" />
+            <Chip active={filters.onlyContratado} onClick={() => setFilters((f) => ({ ...f, onlyContratado: !f.onlyContratado, hideContratado: false }))} label="Contratados" />
 
             <div className="ml-auto flex items-center gap-2">
               <ArrowUpDown className="h-3.5 w-3.5 text-stone-400 dark:text-stone-500" />
